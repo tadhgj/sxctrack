@@ -17,3 +17,7 @@ Each file is then uploaded to a "temp" directory on sxctrack.
 Once this is done, it deletes everything in the "old" directory, moves everything from "curr" to "old", and then copies "temp" to "curr". I call this the great shuffle.
 
 The "curr" directory is fetched by front-end ajax, and the "old" directory and "temp" directories are kept in case something goes terribly wrong, and I can always view an archived version of the website's data. The file structure has not changed since I devised it, they are all backwards and forwards compatible with the front end.
+
+#### 2/22/2023 addition:
+* Added -neuter, -nuclear, implemented -textarg to further fine-tune one-time script runs
+* Added creation of report.txt. Doesn't need to be parsed as json, but didn't bother adjusting ftpStor function.

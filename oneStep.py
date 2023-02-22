@@ -32,7 +32,20 @@ try:
     parser.add_argument('user', action='store', type=str, help='FTP Username')
     parser.add_argument('passo', action='store', type=str, help='FTP Password')
     parser.add_argument('-textarg', action='store', type=str, help='Input time string if not using default.')
+    # you would call -textarg with a string like "1671490801" like so:
+    # python3 oneStep.py link user pass -textarg "1671490801"
+
+    # add optional argument called -nuclear with default value False
+    parser.add_argument('-nuclear', action='store_true', default=False, help='Re-fetch ALL files from fillmore.homelinux. Will take a long time.')
+    # add optional argument called -neuter with default value False
+    parser.add_argument('-neuter', action='store_true', default=False, help='Dump in temp but not to curr. Useful for testing.')
     parse_results = parser.parse_args()
+
+    #create var neuter
+    textarg = parse_results.textarg
+    nuclear = parse_results.nuclear
+    neuter = parse_results.neuter
+
 
     start_time = int(time.time())
     GMTTime = datetime.datetime.now()
@@ -45,8 +58,6 @@ try:
     #FOR RUNNING ON LOCAL MAC
     # root_logger= logging.getLogger()
     # root_logger.setLevel(logging.DEBUG) # or whatever
-    # handler = logging.FileHandler('test.log', 'w', 'utf-8') # or whatever
-    # handler2 = logging.FileHandler('logs/'+GMTTime.strftime("GMT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8")
     # handler = logging.FileHandler(filename=str(start_time)+'.log', mode='w', encoding='utf-8')
     # handler2 = handler
     # handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
@@ -57,9 +68,9 @@ try:
     #FOR RUNNING ON VPS
     root_logger= logging.getLogger() 
     root_logger.setLevel(logging.DEBUG) # or whatever 
-    handler = logging.FileHandler('/root/sxctrack/test.log', 'w', 'utf-8') #      or whatever 
-    handler2 = logging.FileHandler('/root/sxctrack/logs/'+GMTTime.strftime("G     MT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8") 
-    handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or what     ever 
+    handler = logging.FileHandler('/root/sxctrack/test.log', 'w', 'utf-8') # or whatever 
+    handler2 = logging.FileHandler('/root/sxctrack/logs/'+GMTTime.strftime("GMT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8") 
+    handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever 
     root_logger.addHandler(handler) 
     root_logger.addHandler(handler2)
     #SEE HERE
@@ -79,7 +90,8 @@ try:
 
 
     logging.info("logging into FTP...")
-    logging.info("host: "+str(ftpHost)+", user: "+str(ftpUser)+", pass: "+str(ftpPassword)+".")
+    # logging.info("host: "+str(ftpHost)+", user: "+str(ftpUser)+", pass: "+str(ftpPassword)+".")
+    # SHOULD NOT LOG LOGIN INFO!
     ftpObject = FTP(ftpHost)
 
     #attempt ftp login a maximum of 3 times if it fails
@@ -564,6 +576,38 @@ try:
 
         return outputArr
 
+    def findFreshIDs(objList):
+        # for every item in objList:
+        #   if date is within 2 weeks of today:
+        #   if date is now or the future:
+        #       add id to outputArr
+        # well, you see, anything past two weeks ago would also
+        # include meets that are in the future, so we don't need
+        # to check for that specifically
+
+        #define today
+        today = datetime.date.today()
+
+        #define two weeks ago
+        twoWeeksAgo = today - datetime.timedelta(days=14)
+
+        #define output array
+        outputArr = []
+
+        #loop through objList
+        for objTemp in objList:
+            #log date
+            logging.info("date: "+objTemp['date'])
+
+            #get date
+            dateTemp = datetime.datetime.strptime(objTemp['date'], "%Y-%m-%d").date()
+
+            #compare date
+            if dateTemp > twoWeeksAgo:
+                #add id to outputArr
+                outputArr.append(int(objTemp['id']))
+
+        return outputArr
 
     def find_new_ids(local_list, remote_list):
         #logging.info("local list:"+str(local_list))
@@ -1585,7 +1629,7 @@ try:
                         })
 
             list_events.append(row_events)
-            logging.info("current_id_list: " + str(current_id_list))
+            # logging.info("current_id_list: " + str(current_id_list))
             id_list = id_list + current_id_list
             #id_list.extend(current_id_list)
 
@@ -2819,6 +2863,9 @@ try:
         }
 
         def getSeconds(str):
+            if str == "":
+                logging.info("getSeconds: empty string")
+                return 0
             m = 0
             s = 0
             if ":" in str:
@@ -3660,13 +3707,73 @@ try:
         return bestsObj
 
 
+    #REPORT
+    def createReportPage(meet_data, ath_data, i_neuter, i_nuclear, i_textarg):
+        # find timestamp
+        timestamp = start_time
+
+        
+        out_text = "Report file for "+str(timestamp)+"<br>"
+
+        #print arguments
+
+        out_text += "Arguments: nuclear: "+str(i_nuclear)+", neuter: "+str(i_neuter)+", text: "+str(i_textarg)+"<br>"
+
+        #fresh_ids:
+        out_text += "fresh_ids: "+str(len(fresh_ids))+"<br>"
+        for id in fresh_ids:
+            out_text += str(id)+"<br>"
+
+        out_text += "<br>------<br>"
+
+        #new online meets
+        out_text += "new online meets: "+str(len(new_ids))+"<br>"
+        for id in new_ids:
+            out_text += str(id)+"<br>"
+
+        out_text += "<br>------<br>"
+
+        #calculate all new meets changed
+        out_text += "new meets changed: "+str(len(meet_scan_list))+"<br>"
+        for id in meet_scan_list:
+            out_text += "<a href='https://sxctrack.com/meet/"+str(id)+"'>"+str(id)+"</a><br>"
+
+        out_text += "<br>------<br>"
+
+        #calculate all new athletes changed
+        out_text += "new athletes changed: "+str(len(ath_scan_list))+"<br>"
+        for id in ath_scan_list:
+            out_text += "<a href='https://sxctrack.com/athlete/"+str(id)+"'>"+str(id)+"</a><br>"
+
+        out_text += "<br>------<br>"
+
+        return out_text
+
+
+    #sort_meet_data
+    def sort_meet_data(meet_data):
+        #sort meet data by date
+        #want to convert 1987-05-16 to epoch time
+        meet_data.sort(key=lambda x: int(time.mktime(datetime.datetime.strptime(x['date'], "%Y-%m-%d").timetuple())), reverse=True)
+        return meet_data
+
 
     #READ CURR ATH AND MEET
-    #navigate to curr
-    chdir("/files/curr/")
+    #navigate to curr if no textarg set
+    print(textarg)
+    if textarg == None:
+        chdir("/files/curr/")
+    else:
+        logging.info("nav. to "+textarg+" bc. textarg set")
+        chdir("/debug/file_dump_area/"+textarg+"/")
+
+    #navigate to designated blank if nuclear is true
+    if nuclear:
+        logging.info("nuclear option activated")
+        chdir("/debug/file_dump_area/blank/")
 
 
-    logging.info("nav. to files/curr")
+    logging.info("navigating to specified directory...")
     ath_data = json.loads(getFileFTP("athletes_main_updated.txt"))
     logging.info("downloaded ath_data")
     meet_data = json.loads(getFileFTP("meet_main_updated.txt"))
@@ -3676,6 +3783,8 @@ try:
     #READ HOMELINUX ONLINE FOR ALL IDS
     remote_basic_data = parse_remote_meet_page(fetch_remote_page('http://fillmore.homelinux.net/cgi-bin/Meets?year=*'))
     all_meet_ids = get_ids(remote_basic_data)
+    logging.info("external meet count:"+str(len(all_meet_ids)))
+    logging.info("external list:"+str(all_meet_ids))
 
     #READ SXCTRACK ONLINE FOR BROKEN MEET IDS
     meet_ids_to_scan = []
@@ -3683,18 +3792,28 @@ try:
 
     #READ LOCAL IDS
     local_meet_ids = get_ids(meet_data)
+    logging.info("local meet count:"+str(len(local_meet_ids)))
+    logging.info("local list:"+str(local_meet_ids))
 
     #READ LOCAL IDS FOR FRESH MEETS
     #check meet dates, any < 2 weeks old be scanned
-    fresh_ids = []
+    fresh_ids = findFreshIDs(meet_data);
+    logging.info("fresh_ids: " + str(len(fresh_ids)))
+    for id in fresh_ids:
+        logging.info("fresh_id: " + str(id))
+
 
     #CHECK NEW
     new_ids = find_new_ids(local_meet_ids, all_meet_ids)
+    logging.info("new ids:" + str(len(new_ids)))
+    for id in new_ids:
+        logging.info("new_id: " + str(id))
 
     #TOTAL SCAN LIST
     meet_scan_list = new_ids + meet_ids_to_scan + fresh_ids
     #remove duplicates...
     meet_scan_list = list(set(meet_scan_list))
+    logging.info("meet_scan_list: " + str(len(meet_scan_list)) + " id" + ("s" if len(meet_scan_list) != 1 else ""))
 
     #check if there are ids to scan...
     if len(meet_scan_list) == 0:
@@ -3707,6 +3826,9 @@ try:
 
     #APPEND MEETS TO LOCAL VAR
     meet_data = addToLocal(meet_data, scanned_meet_data)
+
+    #SORT meet_data by date
+    meet_data = sort_meet_data(meet_data)
 
     #GET ONLINE ATH ORDER
     remote_athlete_page_data = getOnlineAthleteOrder()
@@ -3759,18 +3881,12 @@ try:
                 # Break the loop if the socket operation succeeds
                 break
 
-    #meet_file = io.BytesIO(json.dumps(meet_data, separators=(',', ':')).encode('utf-8'))
-    #ftpObject.storbinary('STOR meet_main_updated.txt', meet_file)
     ftpStor("meet_main_updated.txt", meet_data)
     logging.info("successfully stored meet")
 
-    # athlete_file = io.BytesIO(json.dumps(final_athlete_data, separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR athletes_main_updated.txt', athlete_file)
     ftpStor("athletes_main_updated.txt", final_athlete_data)
     logging.info("successfully stored athlete")
 
-    # gender_file = io.BytesIO(json.dumps(genderList, separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR genders.txt', gender_file)
     ftpStor("gender_main_updated.txt", genderList)
     logging.info("successfully stored gender")
 
@@ -3778,8 +3894,6 @@ try:
     #meetBig.txt
     chdir(ftp_out_path+"output/")
     chdir(ftp_out_path+"output/meet/")
-    # meet_file = io.BytesIO(json.dumps(createMeetPage(meet_data, final_athlete_data), separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR meetBig.txt', meet_file)
     ftpStor("meetBig.txt", createMeetPage(meet_data, final_athlete_data));
     logging.info("successfully stored meetBig")
 
@@ -3788,50 +3902,34 @@ try:
     meets_file_list = createMeetsPage(meet_data)
 
     #meetSmall.txt
-    # meet_small_file = io.BytesIO(json.dumps(meets_file_list[0], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR meetSmall.txt', meet_small_file)
     ftpStor("meetSmall.txt", meets_file_list[0])
     logging.info("successfully stored meetSmall")
     #meetsListSmall.txt
-    # meet_list_small_file = io.BytesIO(json.dumps(meets_file_list[1], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR meetsListSmall.txt', meet_list_small_file)
     ftpStor("meetsListSmall.txt", meets_file_list[1])
     logging.info("successfully stored meetsListSmall")
     #meetsListMedium.txt
-    # meet_list_medium_file = io.BytesIO(json.dumps(meets_file_list[2], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR meetsListMedium.txt', meet_list_medium_file)
     ftpStor("meetsListMedium.txt", meets_file_list[2])
     logging.info("successfully stored meetsListMedium")
     #meetsListBig.txt
-    # meet_list_big_file = io.BytesIO(json.dumps(meets_file_list[3], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR meetsListBig.txt', meet_list_big_file)
     ftpStor("meetsListBig.txt", meets_file_list[3])
     logging.info("successfully stored meetsListBig")
     #curr_meets.txt
-    # curr_meets_file = io.BytesIO(json.dumps(meets_file_list[4], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR curr_meets.txt', curr_meets_file)
     ftpStor("curr_meets.txt", meets_file_list[4])
     logging.info("successfully stored curr_meets")
     #search_format_meets.txt
-    # search_format_meets_file = io.BytesIO(json.dumps(meets_file_list[5], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR search_format_meets.txt', search_format_meets_file)
     ftpStor("search_format_meets.txt", meets_file_list[5])
     logging.info("successfully stored search_format_meets")
 
     chdir(ftp_out_path+"output/athlete/")
     #chartData.txt
     chart_json = createChartData(final_athlete_data, meet_data)
-    # chart_file = io.BytesIO(json.dumps(chart_json, separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR chartData.txt', chart_file)
     ftpStor("chartData.txt", chart_json)
     logging.info("successfully stored chartData")
 
     #athlete stuff...
 
     athlete_json = createAthletePage(final_athlete_data, meet_data)
-    # athlete_big_file = io.BytesIO(json.dumps(athlete_json, separators=(',', ':')).encode('utf-8'))
     # #athletesBig.txt
-    # ftpObject.storbinary('STOR athletesBig.txt', athlete_big_file)
     ftpStor("athletesBig.txt", athlete_json)
     logging.info("successfully stored chartData")
 
@@ -3842,33 +3940,21 @@ try:
     #work with list
 
     #athleteSmall.txt
-    # athlete_small_file = io.BytesIO(json.dumps(athletes_list[0], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR athleteSmall.txt', athlete_small_file)
     ftpStor("athleteSmall.txt", athletes_list[0])
     logging.info("successfully stored athleteSmall")
     #athletesMedium.txt
-    # athlete_medium_file = io.BytesIO(json.dumps(athletes_list[1], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR athleteMedium.t', athlete_medium_file)
     ftpStor("athleteMedium.txt", athletes_list[1])
     logging.info("successfully stored athletesMedium")
     #athListTiny.json
-    # athlete_tiny_file = io.BytesIO(json.dumps(athletes_list[2], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR athListTiny.json', athlete_tiny_file)
     ftpStor("athListTiny.json", athletes_list[2])
     logging.info("successfully stored athListTiny")
     #athListSmall.json
-    # athlete_list_small_file = io.BytesIO(json.dumps(athletes_list[3], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR athListSmall.json', athlete_list_small_file)
     ftpStor("athListSmall.json", athletes_list[3])
     logging.info("successfully stored athListSmall")
     #athListMedium.json
-    # athlete_list_medium_file = io.BytesIO(json.dumps(athletes_list[4], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR athListMedium.json', athlete_list_medium_file)
     ftpStor("athListMedium.json", athletes_list[4])
     logging.info("successfully stored athListMedium")
     #curr_athletes.json
-    # curr_athletes_file = io.BytesIO(json.dumps(athletes_list[5], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR curr_athletes.json', curr_athletes_file)
     ftpStor("curr_athletes.json", athletes_list[5])
     logging.info("successfully stored curr_athletes")
 
@@ -3876,13 +3962,9 @@ try:
     chdir(ftp_out_path+"output/calendar/")
     calendar_list = createCalendarPage(meet_data)
     #calendarSmall.txt
-    # calendar_small = io.BytesIO(json.dumps(calendar_list[0], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR calendarSmall.txt', calendar_small)
     ftpStor("calendarSmall.txt", calendar_list[0])
     logging.info("successfully stored calendarSmall")
     #calendarBig.txt
-    # calendar_big = io.BytesIO(json.dumps(calendar_list[1], separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR calendarBig.txt', calendar_big)
     ftpStor("calendarBig.txt", calendar_list[1])
     logging.info("successfully stored calendarBig")
 
@@ -3891,38 +3973,41 @@ try:
     chdir(ftp_out_path+"output/bests/")
     #bests.txt
     best_json = getBestsObj(meet_data, final_athlete_data, genderList)
-    # best_file = io.BytesIO(json.dumps(best_json, separators=(',', ':')).encode('utf-8'))
-    # ftpObject.storbinary('STOR bests.txt', best_file)
     ftpStor("bests.txt", best_json)
     logging.info("successfully stored bests")
 
 
-    #DEBUG
-    #delete test dir
-    #WORKS
-    #deleteFilesInDir("/debug/file_dump_area/deleteTest/")
-
-    #move test
-    #WORKS
-    #moveContents("/debug/file_dump_area/moveTest1/", "/debug/file_dump_area/moveTest2/")
-
-    #copyTest
-    #WORKS
-    #copyContents("/debug/file_dump_area/moveTest2/", "/debug/file_dump_area/moveTest1/")
-    #END DEBUG
+    #report
+    chdir(ftp_out_path)
+    #report.txt
+    report_txt = createReportPage(meet_data, final_athlete_data, neuter, nuclear, textarg)
 
 
-    #delete contents in /files/old/
-    deleteFilesInDir("/files/old/")
+    ftpStor("report.txt", report_txt)
+    logging.info("successfully stored report")
 
-    #move contents of /files/curr/ to /files/old/
-    moveContents("/files/curr/", "/files/old/")
 
-    #delete contents of /files/curr/ (there shouldn't be any there but whatever)
-    #deleteFilesInDir("/files/curr/")
+    ## IF NEUTER IS TRUE, DO NOT SHUFFLE
 
-    #copy contents of /*timestamp*/ to /files/curr/
-    copyContents(str(ftp_out_path), "/files/curr/")
+    if not neuter:
+        #shuffle
+
+        #delete contents in /files/old/
+        deleteFilesInDir("/files/old/")
+
+        #move contents of /files/curr/ to /files/old/
+        moveContents("/files/curr/", "/files/old/")
+
+        #delete contents of /files/curr/ (there shouldn't be any there but whatever)
+        #deleteFilesInDir("/files/curr/")
+
+        #copy contents of /*timestamp*/ to /files/curr/
+        copyContents(str(ftp_out_path), "/files/curr/")
+
+    else:
+        logging.info("neuter is true, not shuffling")
+
+
 
     ftpObject.quit()
 
@@ -3934,3 +4019,6 @@ try:
     # do something here
 except Exception as e:
     logging.critical(e, exc_info=True)
+    time_taken = int(time.time()) - start_time
+    logging.info("took " + str(time_taken) + " seconds")
+    logging.info("finished with error (see above).")
