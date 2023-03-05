@@ -597,7 +597,7 @@ try:
         #loop through objList
         for objTemp in objList:
             #log date
-            logging.info("date: "+objTemp['date'])
+            # logging.info("date: "+objTemp['date'])
 
             #get date
             dateTemp = datetime.datetime.strptime(objTemp['date'], "%Y-%m-%d").date()
@@ -1242,9 +1242,64 @@ try:
         return result_list
 
 
+    #depreciated! use merge_meet_data instead
+    # (merge_meet_data doesn't create duplicate entries)
     def addToLocal(old_array, new_array):
         # add new array to beginning of old array
         return new_array + old_array
+
+    def merge_meet_data(old_data, new_data):
+        # print("merge meet data!")
+
+        # merge new data into old data
+
+        # get ids from both
+        old_ids = get_ids(old_data)
+        new_ids = get_ids(new_data)
+        # print("old ids count:"+str(len(old_data)))
+
+
+        # list of ids in new_ids that are not in old_ids
+        new_ids_not_in_old_ids = []
+
+        # list of meets to append!
+        meets_to_append = []
+
+        # iterate thru new_ids
+        for id in new_ids:
+            if not id in old_ids:
+                new_ids_not_in_old_ids.append(id)
+
+        overWriteCount = 0
+        # iterate thru new_data
+        for meet in new_data:
+            # check if id is in new_ids_not_in_old_ids
+            if str(meet['id']) in str(new_ids_not_in_old_ids):
+                meets_to_append.append(meet)
+            
+            # if this meet is already in old_data, overwrite it
+            else:
+                # iterate thru old_data
+                for old_meet in old_data:
+                    # print("old meet id:"+str(old_meet['id'])+" meet id:"+str(meet['id']))
+                    if old_meet['id'] == meet['id']:
+                        # overwrite
+                        old_meet = meet
+                        overWriteCount+=1
+        
+
+        # print("meets to append:"+str(len(meets_to_append)))
+
+        # add meets to append to old_data
+        output = meets_to_append + old_data
+
+        #debug 
+        # print("old ids now:"+str(len(output)))
+        # print(str(len(new_ids)))
+        # print("new ids not in old ids: " + str(new_ids_not_in_old_ids))
+
+
+        return output
 
 
     def getAthleteIdsFromData(input_data):
@@ -3713,18 +3768,21 @@ try:
         timestamp = start_time
 
         
-        out_text = "Report file for "+str(timestamp)+"<br>"
+        out_text = "<br>Report file for "+str(timestamp)+"<br>"
 
         #print arguments
 
         out_text += "Arguments: nuclear: "+str(i_nuclear)+", neuter: "+str(i_neuter)+", text: "+str(i_textarg)+"<br>"
+
+
+        out_text += "------<br>"
 
         #fresh_ids:
         out_text += "fresh_ids: "+str(len(fresh_ids))+"<br>"
         for id in fresh_ids:
             out_text += str(id)+"<br>"
 
-        out_text += "<br>------<br>"
+        out_text += "------<br>"
 
         #new online meets
         out_text += "new online meets: "+str(len(new_ids))+"<br>"
@@ -3752,6 +3810,9 @@ try:
 
     #sort_meet_data
     def sort_meet_data(meet_data):
+        #check null
+        if meet_data == None:
+            return None
         #sort meet data by date
         #want to convert 1987-05-16 to epoch time
         meet_data.sort(key=lambda x: int(time.mktime(datetime.datetime.strptime(x['date'], "%Y-%m-%d").timetuple())), reverse=True)
@@ -3798,6 +3859,10 @@ try:
     #READ LOCAL IDS FOR FRESH MEETS
     #check meet dates, any < 2 weeks old be scanned
     fresh_ids = findFreshIDs(meet_data);
+    
+    #remove duplicate fresh_ids
+    fresh_ids = list(set(fresh_ids))
+
     logging.info("fresh_ids: " + str(len(fresh_ids)))
     for id in fresh_ids:
         logging.info("fresh_id: " + str(id))
@@ -3811,8 +3876,10 @@ try:
 
     #TOTAL SCAN LIST
     meet_scan_list = new_ids + meet_ids_to_scan + fresh_ids
+
     #remove duplicates...
     meet_scan_list = list(set(meet_scan_list))
+
     logging.info("meet_scan_list: " + str(len(meet_scan_list)) + " id" + ("s" if len(meet_scan_list) != 1 else ""))
 
     #check if there are ids to scan...
@@ -3825,7 +3892,8 @@ try:
     scanned_meet_data = attempt_list_of_ids(meet_scan_list)
 
     #APPEND MEETS TO LOCAL VAR
-    meet_data = addToLocal(meet_data, scanned_meet_data)
+    # meet_data = addToLocal(meet_data, scanned_meet_data)
+    meet_data = merge_meet_data(meet_data, scanned_meet_data)
 
     #SORT meet_data by date
     meet_data = sort_meet_data(meet_data)
