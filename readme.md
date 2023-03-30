@@ -21,3 +21,6 @@ The "curr" directory is fetched by front-end ajax, and the "old" directory and "
 #### 2/22/2023 addition:
 * Added -neuter, -nuclear, implemented -textarg to further fine-tune one-time script runs
 * Added creation of report.txt. Doesn't need to be parsed as json, but didn't bother adjusting ftpStor function.
+
+#### 2/30/2023 addition:
+* merge_meet_data did not overwrite old data. I made a little "forgot that for x in y loops do not actually change y" mistake. Fixed.

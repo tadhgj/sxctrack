@@ -1,0 +1,14 @@
+# all html files
+*.html
+
+# output json files
+*.json
+
+# test files
+relationship.py
+
+# logs
+*.log
+
+# mac os gibberish
+.DS_Store

@@ -1279,14 +1279,15 @@ try:
             
             # if this meet is already in old_data, overwrite it
             else:
-                # iterate thru old_data
-                for old_meet in old_data:
+                #iterate using index
+                for index in range(len(old_data)):
+                    #check if id is the same
                     # print("old meet id:"+str(old_meet['id'])+" meet id:"+str(meet['id']))
-                    if old_meet['id'] == meet['id']:
-                        # overwrite
-                        old_meet = meet
+                    if old_data[index]['id'] == meet['id']:
+                        #overwrite
+                        old_data[index] = meet
                         overWriteCount+=1
-        
+            
 
         # print("meets to append:"+str(len(meets_to_append)))
 
@@ -3845,7 +3846,7 @@ try:
     remote_basic_data = parse_remote_meet_page(fetch_remote_page('http://fillmore.homelinux.net/cgi-bin/Meets?year=*'))
     all_meet_ids = get_ids(remote_basic_data)
     logging.info("external meet count:"+str(len(all_meet_ids)))
-    logging.info("external list:"+str(all_meet_ids))
+    # logging.info("external list:"+str(all_meet_ids))
 
     #READ SXCTRACK ONLINE FOR BROKEN MEET IDS
     meet_ids_to_scan = []
@@ -3854,7 +3855,7 @@ try:
     #READ LOCAL IDS
     local_meet_ids = get_ids(meet_data)
     logging.info("local meet count:"+str(len(local_meet_ids)))
-    logging.info("local list:"+str(local_meet_ids))
+    # logging.info("local list:"+str(local_meet_ids))
 
     #READ LOCAL IDS FOR FRESH MEETS
     #check meet dates, any < 2 weeks old be scanned
