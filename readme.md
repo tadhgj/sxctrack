@@ -26,5 +26,5 @@ The "curr" directory is fetched by front-end ajax, and the "old" directory and "
 * fixed bug caused by new fresh_ids concept and old array merging process
 
 
-#### 2/30/2023 addition:
+#### 3/30/2023 addition:
 * merge_meet_data did not overwrite old data. I made a little "forgot that for x in y loops do not actually change y" mistake. Fixed.
