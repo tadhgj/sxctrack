@@ -61,15 +61,15 @@ try:
 
 
     #FOR RUNNING ON LOCAL MAC
-    handler = logging.FileHandler(filename=str(start_time)+'.log', mode='w', encoding='utf-8')
-    handler2 = handler
-    handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
-    root_logger.addHandler(logging.StreamHandler(sys.stdout))
+    # handler = logging.FileHandler(filename=str(start_time)+'.log', mode='w', encoding='utf-8')
+    # handler2 = handler
+    # handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
+    # root_logger.addHandler(logging.StreamHandler(sys.stdout))
 
     #FOR RUNNING ON VPS
-    # handler = logging.FileHandler('/root/sxctrack/test.log', 'w', 'utf-8') # or whatever 
-    # handler2 = logging.FileHandler('/root/sxctrack/logs/'+GMTTime.strftime("GMT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8") 
-    # handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever 
+    handler = logging.FileHandler('/root/sxctrack/test.log', 'w', 'utf-8') # or whatever 
+    handler2 = logging.FileHandler('/root/sxctrack/logs/'+GMTTime.strftime("GMT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8") 
+    handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever 
 
     # ???
     #to run on macbook...
