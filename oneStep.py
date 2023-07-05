@@ -3774,8 +3774,10 @@ try:
         # find timestamp
         timestamp = start_time
 
+        # convert unix timestamp to EST yyyy-mm-dd hh:mm:ss
+        textTimestamp = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
         
-        out_text = "<br>Report file for "+str(timestamp)+"<br>"
+        out_text = "<br>Report file for "+str(textTimestamp)+"<br>"
 
         #print arguments
 
@@ -3929,9 +3931,11 @@ try:
         # replace "\n" with <br>
         report_txt = report_txt.replace("\n", "<br>")
 
-
-        ftpStor("daily_report.txt", report_txt)
-        logging.info("successfully stored daily report")
+        if not neuter:
+            ftpStor("daily_report.txt", report_txt)
+            logging.info("successfully stored daily report")
+        else:
+            logging.info("neuter option activated, not storing daily report")
 
         exit()
 
@@ -4088,12 +4092,15 @@ try:
 
     chdir("/debug/reports/")
 
-    ftpStor("report"+start_time+".txt", report_txt)
+    ftpStor("report"+str(start_time)+".txt", report_txt)
 
 
     ## IF NEUTER IS TRUE, DO NOT SHUFFLE
 
     if not neuter:
+        # write daily report
+        ftpStor("daily_report.txt", report_txt)
+
         #shuffle
 
         #delete contents in /files/old/
