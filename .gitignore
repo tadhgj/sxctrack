@@ -1,12 +1,12 @@
 # all html files
-*.html
+# *.html
 
 # output json files
 *.json
 
 # test files
-relationship.py
-relationship2.py
+# relationship.py
+# relationship2.py
 
 # logs
 *.log

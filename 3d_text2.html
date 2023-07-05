@@ -1,0 +1,49 @@
+<head>
+  <style> body { margin: 0; } </style>
+
+  <script src="//unpkg.com/react/umd/react.production.min.js"></script>
+  <script src="//unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
+  <script src="//unpkg.com/@babel/standalone"></script>
+
+  <script src="//unpkg.com/three"></script>
+  <script src="//unpkg.com/three-spritetext"></script>
+
+  <script src="//unpkg.com/react-force-graph-3d"></script>
+  <!--<script src="../../src/packages/react-force-graph-3d/dist/react-force-graph-3d.js"></script>-->
+</head>
+
+<body>
+  <div id="graph"></div>
+
+  <style>
+    .scene-tooltip {
+      background:white;
+      color:black;
+    }
+  </style>
+
+  <script type="text/jsx">
+    fetch('d3_obj.json').then(res => res.json()).then(data => {
+      console.log(data);
+      ReactDOM.render(
+        <ForceGraph3D
+          graphData={data}
+          nodeAutoColorBy="group"
+          nodeThreeObject={node => {
+            const sprite = new SpriteText(node.name);
+
+            let tempColor = (node.gender == 'm') ? '#ADD8E6' : (node.gender == 'f') ? '#FF7276' : '#000000';
+            sprite.color = tempColor;
+            sprite.textHeight = 8;
+            return sprite;
+          }}
+          // handle onNodeClick to open link "https://sxctrack.com/athlete/" + id
+          onNodeClick={node => window.open("https://sxctrack.com/athlete/" + node.id, "_blank")}
+
+        />,
+        document.getElementById('graph')
+      );
+
+    });
+  </script>
+</body>
