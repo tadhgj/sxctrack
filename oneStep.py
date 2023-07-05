@@ -55,27 +55,33 @@ try:
     #logging.basicConfig(encoding='utf-8', format='%(asctime)s %(levelname)-8s %(message)s', level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     #logging.basicConfig(encoding='utf-8', level=logging.DEBUG)
 
+    # COMMON BETWEEN BOTH
+    root_logger= logging.getLogger()
+    root_logger.setLevel(logging.DEBUG) # or whatever
+
+
     #FOR RUNNING ON LOCAL MAC
-    # root_logger= logging.getLogger()
-    # root_logger.setLevel(logging.DEBUG) # or whatever
-    # handler = logging.FileHandler(filename=str(start_time)+'.log', mode='w', encoding='utf-8')
-    # handler2 = handler
-    # handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
-    # root_logger.addHandler(handler)
-    # root_logger.addHandler(handler2)
-    # root_logger.addHandler(logging.StreamHandler(sys.stdout))
+    handler = logging.FileHandler(filename=str(start_time)+'.log', mode='w', encoding='utf-8')
+    handler2 = handler
+    handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
+    root_logger.addHandler(logging.StreamHandler(sys.stdout))
 
     #FOR RUNNING ON VPS
-    root_logger= logging.getLogger() 
-    root_logger.setLevel(logging.DEBUG) # or whatever 
-    handler = logging.FileHandler('/root/sxctrack/test.log', 'w', 'utf-8') # or whatever 
-    handler2 = logging.FileHandler('/root/sxctrack/logs/'+GMTTime.strftime("GMT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8") 
-    handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever 
-    root_logger.addHandler(handler) 
-    root_logger.addHandler(handler2)
-    #SEE HERE
+    # handler = logging.FileHandler('/root/sxctrack/test.log', 'w', 'utf-8') # or whatever 
+    # handler2 = logging.FileHandler('/root/sxctrack/logs/'+GMTTime.strftime("GMT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8") 
+    # handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever 
+
+    # ???
     #to run on macbook...
     #filename=str(start_time)+'.log',
+    # ???
+
+    # COMMON BETWEEN BOTH
+    root_logger.addHandler(handler) 
+    root_logger.addHandler(handler2)
+    log_stream = io.StringIO()
+    log_handler = logging.StreamHandler(log_stream)
+    root_logger.addHandler(log_handler)
 
     #BEGIN
     logging.info("starting time: " + str(start_time))
@@ -3819,6 +3825,24 @@ try:
         meet_data.sort(key=lambda x: int(time.mktime(datetime.datetime.strptime(x['date'], "%Y-%m-%d").timetuple())), reverse=True)
         return meet_data
 
+    def ftpStor(filename, file_json):
+        #convert file_json to bytesIO
+        file = io.BytesIO(json.dumps(file_json, separators=(',', ':')).encode('utf-8'))
+
+        #attempt to store file max 3 times
+        for i in range(3):
+            try:
+                ftpObject.storbinary('STOR ' + filename, file)
+                logging.info("successfully stored " + filename)
+                return
+            except socket.timeout:
+                # Retry the socket operation if a timeout error occurs
+                logging.info("failed to store " + filename + " on attempt " + str(i))
+                continue
+            else:
+                # Break the loop if the socket operation succeeds
+                break
+
 
     #READ CURR ATH AND MEET
     #navigate to curr if no textarg set
@@ -3883,10 +3907,32 @@ try:
 
     logging.info("meet_scan_list: " + str(len(meet_scan_list)) + " id" + ("s" if len(meet_scan_list) != 1 else ""))
 
+    ftp_out_path = "/debug/file_dump_area/" + str(start_time) + "/"
+
     #check if there are ids to scan...
     if len(meet_scan_list) == 0:
         #escape!
         logging.info("difference = 0; my job here is done.")
+
+        # write to report.txt...
+        # where should daily report go?
+        # chdir("/files/curr/")
+        # chdir(ftp_out_path)
+        chdir("/debug/reports/")
+        #report.txt
+        # set report.txt to logging output
+
+        # print(log_stream.getvalue())
+        # report_txt = logging.getLogger().handlers[0].stream.getvalue()
+        report_txt = log_stream.getvalue()
+
+        # replace "\n" with <br>
+        report_txt = report_txt.replace("\n", "<br>")
+
+
+        ftpStor("daily_report.txt", report_txt)
+        logging.info("successfully stored daily report")
+
         exit()
 
     #SCAN THESE MEETS
@@ -3928,27 +3974,10 @@ try:
     genderList = getGenderList(final_athlete_data, meet_data)
     #where can gender be added? should it be added to athsmall?
 
-    ftp_out_path = "/debug/file_dump_area/" + str(start_time) + "/"
     chdir(ftp_out_path)
     logging.info("successfully navigated to dir...")
 
-    def ftpStor(filename, file_json):
-        #convert file_json to bytesIO
-        file = io.BytesIO(json.dumps(file_json, separators=(',', ':')).encode('utf-8'))
 
-        #attempt to store file max 3 times
-        for i in range(3):
-            try:
-                ftpObject.storbinary('STOR ' + filename, file)
-                logging.info("successfully stored " + filename)
-                return
-            except socket.timeout:
-                # Retry the socket operation if a timeout error occurs
-                logging.info("failed to store " + filename + " on attempt " + str(i))
-                continue
-            else:
-                # Break the loop if the socket operation succeeds
-                break
 
     ftpStor("meet_main_updated.txt", meet_data)
     logging.info("successfully stored meet")
@@ -4053,7 +4082,13 @@ try:
 
 
     ftpStor("report.txt", report_txt)
-    logging.info("successfully stored report")
+    logging.info("successfully stored report 1")
+
+    # also write report in /debug/reports/
+
+    chdir("/debug/reports/")
+
+    ftpStor("report"+start_time+".txt", report_txt)
 
 
     ## IF NEUTER IS TRUE, DO NOT SHUFFLE

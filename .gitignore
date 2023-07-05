@@ -6,9 +6,13 @@
 
 # test files
 relationship.py
+relationship2.py
 
 # logs
 *.log
 
 # mac os gibberish
 .DS_Store
+
+#itself
+.gitignore
