@@ -17,11 +17,12 @@ from bs4 import BeautifulSoup
 import json
 import time
 import argparse
-from ftplib import FTP
+import ftplib
 import datetime
 #for timezone
 import pytz
 import sys
+import os
 
 #wrap entire script in try/except to catch any errors
 
@@ -39,12 +40,17 @@ try:
     parser.add_argument('-nuclear', action='store_true', default=False, help='Re-fetch ALL files from fillmore.homelinux. Will take a long time.')
     # add optional argument called -neuter with default value False
     parser.add_argument('-neuter', action='store_true', default=False, help='Dump in temp but not to curr. Useful for testing.')
+
+    # add optional argument called -local with default value False
+    parser.add_argument('-local', action='store_true', default=False, help='Use relative directories. Default false, as default target is defined VPS environment');
+
     parse_results = parser.parse_args()
 
     #create var neuter
     textarg = parse_results.textarg
     nuclear = parse_results.nuclear
     neuter = parse_results.neuter
+    localbool = parse_results.local
 
 
     start_time = int(time.time())
@@ -59,22 +65,23 @@ try:
     root_logger= logging.getLogger()
     root_logger.setLevel(logging.DEBUG) # or whatever
 
+    if (localbool):
+        # make ./logs if not there
+        if not os.path.exists('logs'):
+            os.makedirs('logs')
 
-    #FOR RUNNING ON LOCAL MAC
-    # handler = logging.FileHandler(filename=str(start_time)+'.log', mode='w', encoding='utf-8')
-    # handler2 = handler
-    # handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
-    # root_logger.addHandler(logging.StreamHandler(sys.stdout))
+        #FOR RUNNING ON LOCAL MAC
+        handler = logging.FileHandler(filename="logs/"+str(start_time)+'.log', mode='w', encoding='utf-8')
+        handler2 = handler
+        handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
+        root_logger.addHandler(logging.StreamHandler(sys.stdout))
+    
+    else:
+        #FOR RUNNING ON VPS
+        handler = logging.FileHandler('/root/sxctrack/test.log', 'w', 'utf-8') # or whatever 
+        handler2 = logging.FileHandler('/root/sxctrack/logs/'+GMTTime.strftime("GMT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8") 
+        handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever 
 
-    #FOR RUNNING ON VPS
-    handler = logging.FileHandler('/root/sxctrack/test.log', 'w', 'utf-8') # or whatever 
-    handler2 = logging.FileHandler('/root/sxctrack/logs/'+GMTTime.strftime("GMT_%Y-%m-%d_%H:%M:%S_oneStep.log"), "w", "utf-8") 
-    handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever 
-
-    # ???
-    #to run on macbook...
-    #filename=str(start_time)+'.log',
-    # ???
 
     # COMMON BETWEEN BOTH
     root_logger.addHandler(handler) 
@@ -98,39 +105,93 @@ try:
     logging.info("logging into FTP...")
     # logging.info("host: "+str(ftpHost)+", user: "+str(ftpUser)+", pass: "+str(ftpPassword)+".")
     # SHOULD NOT LOG LOGIN INFO!
-    ftpObject = FTP(ftpHost)
+    # ftpObject = ftplib.FTP_TLS(ftpHost)
+    ftpObject = ftplib.FTP(ftpHost)
+    # ftpObject.set_pasv(False)
 
-    #attempt ftp login a maximum of 3 times if it fails
-    for i in range(3):
-        try:
-            ftpObject.login(user=ftpUser, passwd=ftpPassword)
-            break
-        except:
-            logging.info("failed to login, trying again...")
-            time.sleep(1)
-            if i == 2:
-                logging.info("failed to login, exiting...")
-                exit()
-            continue
-    logging.info("successful")
+    def ftpLogin():
+        logging.info("attempting ftp login")
+        # should I make sure that we're not already logged in / kill any existing FTP work?
+        for i in range(3):
+            try:
+                ftpObject.login(user=ftpUser, passwd=ftpPassword)
+                break
+            except:
+                logging.info("failed to login, trying again...")
+                time.sleep(1)
+                if i == 2:
+                    logging.info("failed to login, exiting...")
+                    exit()
+                continue
+        logging.info("login successful")
+
+    # define failed FTP login class so it looks nice
+    class FTPLoginFailed(Exception):
+        pass
+
+    def ftpLoginThrow():
+        logging.info("attempting ftp login")
+        # should I make sure that we're not already logged in / kill any existing FTP work?
+        for i in range(3):
+            try:
+                ftpObject.login(user=ftpUser, passwd=ftpPassword)
+                break
+            except Exception as e:
+                logging.info("failed to login, trying again...")
+                logging.info("specific error: "+str(e)+".")
+                time.sleep(1)
+                if i == 2:
+                    logging.info("failed to login, exiting...")
+                    raise FTPLoginFailed("couldn't log in")
+
+        logging.info("login successful")
+
+    def ftpLogout():
+        logging.info("ftp logging out...")
+        ftpObject.quit()
+        logging.info("ftp logged out")
+
+    def ftpLogoutLogin():
+        logging.info("ftp logging out...")
+        ftpObject.quit()
+        logging.info("ftp logged out")
+        ftpObject = ftplib.FTP(ftpHost)
+        ftpLoginThrow()
+
+    def navigateToRoot():
+        for i in range(6):
+            try:
+                ftpObject.cwd("/")
+                break
+            except Exception as e:
+                logging.info("could not navigate: "+str(e))
+                logging.info("trying again... (attempt "+str(i+1)+" of 6)")
+                time.sleep(1)
+                if i == 2:
+                    logging.info("failed to navigate to root, trying to log out and log in to recover...")
+                    ftpLogoutLogin
+                    # if ftpLogin fails, the script fails permanently
+                    # else, try this until i = 5
+
+                if i == 5:
+                    logging.info("failed to navigate to root even after re-logging in, exiting...")
+                    exit()
+
+                continue
+
+
+    # supposedly works
+    ftpLogin()
 
     #FTP FUNCTIONS
     #navigate to directory ALWAYS FROM ROOT and create it if it does not exist
     def chdir(dir):
+        logging.info("chdir: "+str(dir))
         #navigate to root
 
         #attempt to navigate to root a maximum of 3 times if it fails
-        for i in range(3):
-            try:
-                ftpObject.cwd("/")
-                break
-            except:
-                logging.info("failed to navigate to root, trying again... (attempt "+str(i)+" of 3)")
-                time.sleep(1)
-                if i == 2:
-                    logging.info("failed to navigate to root, exiting...")
-                    exit()
-                continue
+        # if this fails, try to log in again?
+        navigateToRoot()
 
         #split by /
         dirSplit = dir.split("/")
@@ -229,17 +290,7 @@ try:
 
         # navigate to root
         #attempt to navigate to root a maximum of 3 times if it fails
-        for i in range(3):
-            try:
-                ftpObject.cwd("/")
-                break
-            except:
-                logging.info("failed to navigate to root, trying again... (attempt "+str(i)+" of 3)")
-                time.sleep(1)
-                if i == 2:
-                    logging.info("failed to navigate to root, exiting...")
-                    exit()
-                continue
+        navigateToRoot()
 
         # split by /
         dirSplit = dir.split("/")
@@ -307,17 +358,7 @@ try:
         logging.info("moving files from '"+dir+"' to '"+newDir+"'")
         # navigate to root
         #attempt to navigate to root a maximum of 3 times if it fails
-        for i in range(3):
-            try:
-                ftpObject.cwd("/")
-                break
-            except:
-                logging.info("failed to navigate to root, trying again... (attempt "+str(i)+" of 3)")
-                time.sleep(1)
-                if i == 2:
-                    logging.info("failed to navigate to root, exiting...")
-                    exit()
-                continue
+        navigateToRoot()
 
         # split by /
         dirSplit = dir.split("/")
@@ -369,17 +410,7 @@ try:
     def copyFile(fullFileName, targetDir):
         # navigate to root
         #attempt to navigate to root a maximum of 3 times if it fails
-        for i in range(3):
-            try:
-                ftpObject.cwd("/")
-                break
-            except:
-                logging.info("failed to navigate to root, trying again... (attempt "+str(i)+" of 3)")
-                time.sleep(1)
-                if i == 2:
-                    logging.info("failed to navigate to root, exiting...")
-                    exit()
-                continue
+        navigateToRoot()
 
         # split by /
         dirSplit = fullFileName.split("/")
@@ -437,17 +468,8 @@ try:
     def copyContents(dir, newDir):
         # navigate to root
         # attempt to navigate to root a maximum of 3 times if it fails
-        for i in range(3):
-            try:
-                ftpObject.cwd("/")
-                break
-            except:
-                logging.info("failed to navigate to root, trying again... (attempt " + str(i) + " of 3)")
-                time.sleep(1)
-                if i == 2:
-                    logging.info("failed to navigate to root, exiting...")
-                    exit()
-                continue
+        navigateToRoot()
+
         # split by /
         dirSplit = dir.split("/")
         # remove empty
@@ -3939,6 +3961,10 @@ try:
 
         exit()
 
+    # log out of FTP server
+    # because the job can go for 2+ hours and FTP doesn't like that
+    ftpLogout()
+
     #SCAN THESE MEETS
     scanned_meet_data = attempt_list_of_ids(meet_scan_list)
 
@@ -3977,6 +4003,42 @@ try:
     #gender list
     genderList = getGenderList(final_athlete_data, meet_data)
     #where can gender be added? should it be added to athsmall?
+
+    # restart FTP connection to upload files.
+    # IF THIS FAILS:
+    # STORE DATA SOMEWHERE TO TRY TO RECOVER AND UPLOAD LATER
+
+    ftpObject = ftplib.FTP(ftpHost)
+    try:
+        ftpLoginThrow()
+    except: 
+        # store meet_data, final_athlete_data, genderList
+        # in logs/failedToUpload/....json
+        failed_file_path = "logs/failedToUpload/"
+
+        if not os.path.exists('logs/failedToUpload/'):
+            os.makedirs('logs/failedToUpload/')
+        # else:
+            # clear out directory to make space for the new stuff, or let it overwrite?
+            
+
+        # make sure file path exists?
+    
+        # Write the data to the JSON file
+        with open(failed_file_path+"athlete_data.json", 'w') as athlete_file:
+            json.dump(final_athlete_data, athlete_file)
+
+        with open(failed_file_path+"meet_data.json", 'w') as meet_file:
+            json.dump(meet_data, meet_file)
+
+        with open(failed_file_path+"gender_data.json", 'w') as gender_file:
+            json.dump(genderList, gender_file)
+
+        # and exit by raising an exception
+        raise Exception("failed to reconnect to ftp and stored files locally")
+
+
+
 
     chdir(ftp_out_path)
     logging.info("successfully navigated to dir...")
@@ -4103,17 +4165,25 @@ try:
 
         #shuffle
 
-        #delete contents in /files/old/
-        deleteFilesInDir("/files/old/")
+        oldTrue = False
+        if (oldTrue):
+            #delete contents in /files/old/
+            deleteFilesInDir("/files/old/")
 
-        #move contents of /files/curr/ to /files/old/
-        moveContents("/files/curr/", "/files/old/")
+            #move contents of /files/curr/ to /files/old/
+            moveContents("/files/curr/", "/files/old/")
 
-        #delete contents of /files/curr/ (there shouldn't be any there but whatever)
-        #deleteFilesInDir("/files/curr/")
+            #delete contents of /files/curr/ (there shouldn't be any there but whatever)
+            #deleteFilesInDir("/files/curr/")
 
-        #copy contents of /*timestamp*/ to /files/curr/
-        copyContents(str(ftp_out_path), "/files/curr/")
+            #copy contents of /*timestamp*/ to /files/curr/
+            copyContents(str(ftp_out_path), "/files/curr/")
+
+        else:
+            # insead, edit "currVar.txt" to be ftp_out_path
+            navigateToRoot()
+            ftpStor("currVar.txt", start_time);
+            # saves a lot of time!
 
     else:
         logging.info("neuter is true, not shuffling")

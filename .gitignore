@@ -16,3 +16,6 @@
 
 #itself
 .gitignore
+
+# vim swap files
+.*.swp
